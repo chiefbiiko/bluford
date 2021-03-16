@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: 2010-09-09
 
 Parameters:
   PublicKeyName:
@@ -6,6 +6,7 @@ Parameters:
       EC2 SSH public key name
       must have been pushed to ec2 with 'aws ec2 import-key-pair'
     Type: String
+    Default: id_rsa_zyzx_1615910462.pub
 
   Environment:
     Description: Application environment
