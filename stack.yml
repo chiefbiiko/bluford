@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  PublicKeyName:
+    Description: |
+      EC2 SSH public key name
+      must have been pushed to ec2 with 'aws ec2 import-key-pair'
+    Type: String
+
+  Environment:
+    Description: Application environment
+    Type: String
+    AllowedValues:
+      - test
+      - prod
+    Default: test
+
+SnapshotId:
+  Description: EBS snapshot id on which to base the volume
+  Type: String
+  Default: !Ref AWS::NoValue
+
+VolumeSizeGib:
+  Description: Size of the EBS volume in GiB
+  Type: Number
+  Default: 50
+
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: m4.large
+
+  InstanceTenancy:
+    Description: EC2 instance tenancy type
+    Type: String
+    Default: default
+    AllowedValues:
+      - default
+      - dedicated
+
+  InstanceName:
+    Description: EC2 instance name
+    Type: String
+    Default: node
+
+  InstanceImage:
+    Description: Amazon machine image for the EC2 instance
+    Type: String
+    Default: ami-0e6273fe5a9a1ad93
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 172.26.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: !Ref InstanceTenancy
+
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [ 0, !Cidr [ !GetAtt VPC.CidrBlock, 1, 3 ]]
+      AvailabilityZone: !Sub ${AWS::Region}a
+      MapPublicIpOnLaunch: true
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+
+  Route:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: !Sub ${AWS::StackName}-security-group
+      GroupName: !Sub ${AWS::StackName}-security-group
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - Description: !Sub ${AWS::StackName}-security-group-ingress-ssh
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+ 
+        - Description: !Sub ${AWS::StackName}-security-group-ingress-p2p
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 30333
+          ToPort: 30333
+
+        - Description: !Sub ${AWS::StackName}-security-group-ingress-p2p-proxy
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+
+        - Description: !Sub ${AWS::StackName}-security-group-ingress-vpn
+          CidrIp: 0.0.0.0/0
+          IpProtocol: udp
+          FromPort: 51820
+          ToPort: 51820
+
+        - Description: !Sub ${AWS::StackName}-security-group-ingress-prometheus
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 9100
+          ToPort: 9100
+
+      SecurityGroupEgress:
+        - Description: !Sub ${AWS::StackName}-security-group-egress-all
+          CidrIp: 0.0.0.0/0
+          IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 0
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: !Ref InstanceImage
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref PublicKeyName
+      AvailabilityZone: !Sub ${AWS::Region}a
+      SubnetId: !Ref Subnet
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      Volumes:
+        - VolumeId: !Ref Volume
+
+  Volume:
+    Type: AWS::EC2::Volume
+    Properties:
+      AvailabilityZone: !Sub ${AWS::Region}a
+      Encrypted: true
+      Size: !Ref VolumeSizeGib
+      SnapshotId: !Ref SnapshotId
+      VolumeType: gp3
+
+resource "aws_instance" "main-{{ name }}" {
+  ami           = var.image
+  instance_type = var.machine_type
+  key_name      = "{{ name }}"
+  count         = var.node_count
+
+  subnet_id              = aws_subnet.main-{{ name }}.id
+  vpc_security_group_ids = [aws_security_group.main-{{ name }}.id]
+
+  root_block_device {
+    volume_size = 400
+  }
+
+  tags = {
+    Name = "{{name}}-${count.index}"
+  }
+}
+
+
+Outputs:
