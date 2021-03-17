@@ -154,7 +154,8 @@ Resources:
       SecurityGroupIds:
         - !Ref SecurityGroup
       Volumes:
-        - VolumeId: !Ref Volume
+        - Device: /dev/sdh
+          VolumeId: !Ref Volume
 
   Volume:
     Type: AWS::EC2::Volume
