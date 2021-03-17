@@ -3,8 +3,5 @@
 ## todo
 
 + tune instance and volume
++ revive from a snapshot
 + ...
-
-## remember
-
-+ 2 persist the rsa keys to a usb drive before going live
