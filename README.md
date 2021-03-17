@@ -2,6 +2,6 @@
 
 ## todo
 
-+ tune instance and volume
-+ revive from a snapshot
++ review ingress
++ take & revive from ebs snapshots
 + ...

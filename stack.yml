@@ -1,6 +1,10 @@
 AWSTemplateFormatVersion: 2010-09-09
 
 Parameters:
+  # SnapshotId:
+  #   Description: EBS snapshot id on which to base the volume
+  #   Type: String
+
   PublicKeyName:
     Description: |
       EC2 SSH public key name
@@ -15,11 +19,6 @@ Parameters:
       - test
       - prod
     Default: test
-
-  SnapshotId:
-    Description: EBS snapshot id on which to base the volume
-    Type: String
-    Default: AWS::NoValue
 
   VolumeSizeGiB:
     Description: Size of the EBS volume in GiB
@@ -156,7 +155,7 @@ Resources:
       AvailabilityZone: !Sub ${AWS::Region}a
       Encrypted: true
       Size: !Ref VolumeSizeGiB
-      SnapshotId: !Ref SnapshotId
+      # SnapshotId: !Ref SnapshotId
       VolumeType: gp3
 
 Outputs:
