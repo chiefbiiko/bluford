@@ -21,40 +21,47 @@ aws cloudformation create-change-set \
   --change-set-type $change_set_type \
   --template-body file://stack.yml
 
-if [ "$change_set_type" = UPDATE ]; then
-  change_set="$( \
-    aws cloudformation describe-change-set \
-      --stack-name $stack_name \
-      --change-set-name $change_set_name \
-  )"
+change_set="$( \
+  aws cloudformation describe-change-set \
+    --stack-name $stack_name \
+    --change-set-name $change_set_name \
+)"
+
+echo "$change_set"
+
+echo -n "execute change set? (y/n) "
+read answer
+
+if [ "$answer" == "${answer#[Yy]}" ]; then
+    echo "you said no"
+    exit 0 # above actually means no :D
+fi
+
+instance="$( \
+  jq -r '.Changes[] | select(.ResourceChange.LogicalResourceId == "Instance")' <<< "$change_set" \
+)"
+
+instance_replacement="$(jq -r '.ResourceChange.Replacement' <<< "$instance")"
+
+if [ "$instance_replacement" = True ]; then
+  echo "detachin volume"
 
   stack="$( \
     aws cloudformation describe-stacks \
       --stack-name $stack_name \
   )"
 
-  instance="$( \
-    jq -r '.Changes[] | select(.ResourceChange.LogicalResourceId == "Instance")' <<< "$change_set" \
-  )"
-
   volume_id="$( \
     jq -r '.Stacks[] | select(.StackName == "zyzx") | .Outputs[] | select(.OutputKey == "VolumeId") | .OutputValue' <<< "$stack" \
   )"
 
-  instance_replacement="$(jq -r '.ResourceChange.Replacement' <<< "$instance")"
   instance_id="$(jq -r '.ResourceChange.PhysicalResourceId' <<< "$instance")"
 
-  if [ "$instance_replacement" = True ]; then
-    echo "detachin volume"
-
-    aws ec2 detach-volume \
-      --device /dev/sdh \
-      --instance-id $instance_id \
-      --volume-id $volume_id
-  fi
+  aws ec2 detach-volume \
+    --device /dev/xvdh \
+    --instance-id $instance_id \
+    --volume-id $volume_id
 fi
-
-echo "executin change set"
 
 aws cloudformation execute-change-set \
   --stack-name $stack_name \
