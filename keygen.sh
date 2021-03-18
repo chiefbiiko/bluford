@@ -1,12 +1,12 @@
 #!/bin/bash
 
-set -eEu
+source ./.env
 
 echo "generating a fresh key pair..."
 
-KEY_NAME="id_rsa_zyzx_$(date +%s)"
+KEY_NAME="id_rsa_$STACK_NAME_$(date +%s)"
 
-ssh-keygen -t rsa -m PEM -b 4096 -a 100 -C zyzx-ssh -f $HOME/.ssh/$KEY_NAME
+ssh-keygen -t rsa -m PEM -b 4096 -a 10000 -C zyzx-ssh -f $HOME/.ssh/$KEY_NAME
 
 echo "pushing the public key to ec2..."
 

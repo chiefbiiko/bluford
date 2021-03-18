@@ -12,7 +12,6 @@ if [[ "${answer,,}" != "y" ]]; then exit 0; fi
 
 echo "destroyin the $STACK_NAME stack"
 
-aws cloudformation delete-stack --stack-name $STACK_NAME
-#   --retain-resources
+aws cloudformation delete-stack --stack-name $STACK_NAME # --retain-resources
 
 aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
