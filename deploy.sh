@@ -3,7 +3,10 @@
 source ./.env
 source ./util.sh
 
-if stack_exists $STACK_NAME; then
+stack_exists $STACK_NAME
+existed=$?
+
+if $existed; then
   change_set_type=UPDATE
 else
   change_set_type=CREATE
@@ -59,3 +62,10 @@ fi
 aws cloudformation execute-change-set \
   --stack-name $STACK_NAME \
   --change-set-name $CHANGE_SET_NAME
+
+
+if $existed; then
+  aws cloudformation wait stack-update-complete --stack-name $STACK_NAME
+else
+  aws cloudformation wait stack-create-complete --stack-name $STACK_NAME
+fi
