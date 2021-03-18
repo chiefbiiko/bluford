@@ -28,7 +28,7 @@ echo "$change_set"
 read -n 1 -p "execute change set? (y/n) " answer
 echo
 
-if [[ "${answer,,}" == "n" ]]; then exit 0; fi
+if [[ "${answer,,}" != "y" ]]; then exit 0; fi
 
 instance="$( \
   jq -r '.Changes[] | select(.ResourceChange.LogicalResourceId == "Instance")' <<< "$change_set" \
