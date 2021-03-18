@@ -5,6 +5,10 @@ Parameters:
   #   Description: EBS snapshot id on which to base the volume
   #   Type: String
 
+  GantreeAPIKey:
+    Description: API key for Grantree
+    Type: String
+
   # default
   # 099720109477/ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20210315
   InstanceImage:
@@ -21,6 +25,11 @@ Parameters:
     Description: EC2 username
     Type: String
     Default: ubuntu
+
+  MoonbeamCollatorPublicAddress:
+    Description: Public address/key of the Moonbeam collator node
+    Type: String
+    Default: "0x21CE00Dd614253FEc68E1EEeC547068883dd91AC"
 
   MoonbeamBinaryGzipURL:
     Description: Github release URL serving a gzipped prebuilt moonbeam binary
@@ -127,29 +136,17 @@ Resources:
           FromPort: 22
           ToPort: 22
  
-        - Description: !Sub ${AWS::StackName}-security-group-ingress-p2p
+        - Description: !Sub ${AWS::StackName}-security-group-ingress-p2p-collator
           CidrIp: 0.0.0.0/0
           IpProtocol: tcp
           FromPort: 30333
           ToPort: 30333
 
-        - Description: !Sub ${AWS::StackName}-security-group-ingress-p2p-proxy
+        - Description: !Sub ${AWS::StackName}-security-group-ingress-p2p-full-node
           CidrIp: 0.0.0.0/0
           IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-
-        - Description: !Sub ${AWS::StackName}-security-group-ingress-vpn
-          CidrIp: 0.0.0.0/0
-          IpProtocol: udp
-          FromPort: 51820
-          ToPort: 51820
-
-        - Description: !Sub ${AWS::StackName}-security-group-ingress-prometheus
-          CidrIp: 0.0.0.0/0
-          IpProtocol: tcp
-          FromPort: 9100
-          ToPort: 9100
+          FromPort: 30334
+          ToPort: 30334
 
       SecurityGroupEgress:
         - Description: !Sub ${AWS::StackName}-security-group-egress-all
@@ -182,6 +179,7 @@ Resources:
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
+      LaunchTemplateName: !Sub ${AWS::StackName}-launch-template
       LaunchTemplateData:
         ImageId: !Ref InstanceImage
         InstanceType: !Ref InstanceType
@@ -193,12 +191,15 @@ Resources:
           "Fn::Sub": |
             #!/bin/bash
             /usr/bin/sudo /usr/sbin/adduser moonbase_service --system --no-create-home
+
             /bin/mkdir ${VolumeDataDir}
             /bin/chmod 0755 ${VolumeDataDir}
             /bin/chown moonbase_service ${VolumeDataDir}
+
             /bin/mkdir -p /home/${EC2Username}/bin
             /bin/curl -sSf --proto '=https' --tlsv1.2 -L ${MoonbeamBinaryGzipURL} | gunzip > /home/${EC2Username}/bin/moonbeam
             /bin/chmod 0755 /home/${EC2Username}/bin/moonbeam
+
             /usr/bin/echo -e "
               [Unit]
               Description="Moonbase Alpha systemd service"
@@ -216,7 +217,7 @@ Resources:
               ExecStart=/home/${EC2Username}/bin/moonbeam \
                 --parachain-id 1000 \
                 --collator \
-                --author-id PUBLIC_KEY \
+                --author-id ${MoonbeamCollatorPublicAddress} \
                 --port 30333 \
                 --rpc-port 9933 \
                 --ws-port 9944 \
@@ -238,9 +239,74 @@ Resources:
               WantedBy=multi-user.target
             " \
             > /etc/systemd/system/moonbeam.service
+
             /usr/bin/sudo systemctl enable moonbeam.service
             /usr/bin/sudo systemctl start moonbeam.service
-      LaunchTemplateName: !Sub ${AWS::StackName}-launch-template
+
+            /bin/mkdir -p /var/lib/gantree/relay
+            /bin/mkdir -p /var/lib/gantree/parachain
+            
+            /usr/bin/echo -e "
+            {
+              "api_key": "TODO",
+              "project_id": "moonbase-alpha",
+              "client_id": "${AWS::StackName}-relay",
+              "pckrc": "TODO",
+              "metrics_host": "http://127.0.0.1:9615"
+            }
+            " \
+            > /var/lib/gantree/relay/.gnw_config.json
+
+            /usr/bin/echo -e "
+            {
+              "api_key": "TODO",
+              "project_id": "moonbase-alpha",
+              "client_id": "${AWS::StackName}-parachain",
+              "pckrc": "TODO",
+              "metrics_host": "http://127.0.0.1:9616"
+            }
+            " \
+            > /var/lib/gantree/parachain/.gnw_config.json
+
+            /usr/bin/echo -e "
+            [Unit]
+            Description=Gantree Node Watchdog Relay
+            After=network.target
+
+            [Service]
+            WorkingDirectory=/var/lib/gantree/relay
+            Type=simple
+            Restart=always
+            ExecStart=/usr/local/bin/gantree_node_watchdog
+
+            [Install]
+            WantedBy=multi-user.target
+            " \
+            > /etc/systemd/system/gantree-relay.service
+
+            /usr/bin/echo -e "
+            [Unit]
+            Description=Gantree Node Watchdog Parachain
+            After=network.target
+
+            [Service]
+            WorkingDirectory=/var/lib/gantree/parachain
+            Type=simple
+            Restart=always
+            ExecStart=/usr/local/bin/gantree_node_watchdog
+
+            [Install]
+            WantedBy=multi-user.target
+            " \
+            > /etc/systemd/system/gantree-parachain.service
+
+            /usr/bin/sudo /bin/systemctl enable gantree-relay
+            /usr/bin/sudo /bin/systemctl start gantree-relay
+            /bin/journalctl -f -u gantree-relay
+
+            /usr/bin/sudo /bin/systemctl enable gantree-parachain
+            /usr/bin/sudo /bin/systemctl start gantree-parachain
+            /bin/journalctl -f -u gantree-parachain
 
 Outputs:
   PublicIp:
