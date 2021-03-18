@@ -184,3 +184,6 @@ Outputs:
   PublicIp:
     Description: Public IP of the node
     Value: !GetAtt Instance.PublicIp
+  VolumeId:
+    Description: Id of the EBS volume
+    Value: !Ref Volume
