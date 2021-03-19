@@ -40,10 +40,15 @@ Parameters:
     Type: String
     Default: https://github.com/nuggetdigital/moonbeam-binary/releases/download/v0.6.0/moonbeam-v0.6.0-ubuntu-20.04.gz
 
+  MoonbeamGantreeNodeWatchdogTarballURL:
+    Description: Github release URL serving a tarballed prebuilt gantree watchdog binary
+    Type: String
+    Default: https://github.com/gantree-io/gantree-node-watchdog/releases/download/v1.1.0rc1/gantree-node-watchdog-v1.1.0rc1-linux.tar.gz
+
   VolumeDataDir:
     Description: Data dir path on the EBS volume
     Type: String
-    Default: /var/lib/alphanet-data
+    Default: /var/lib/.moonbeam/alphanet # TODO actually switch to a volume dir
 
   Environment:
     Description: Application environment
@@ -193,15 +198,27 @@ Resources:
         UserData: !Base64
           "Fn::Sub": |
             #!/bin/bash
-            /usr/bin/sudo /usr/sbin/adduser moonbase_service --system --no-create-home
-
-            /bin/mkdir ${VolumeDataDir}
-            /bin/chmod 0755 ${VolumeDataDir}
-            /bin/chown moonbase_service ${VolumeDataDir}
+            /bin/mkdir -p ${VolumeDataDir} # TODO prep & switch to the volume
 
             /bin/mkdir -p /home/${EC2Username}/bin
-            /bin/curl -sSf --proto '=https' --tlsv1.2 -L ${MoonbeamBinaryGzipURL} | gunzip > /home/${EC2Username}/bin/moonbeam
+
+            /bin/curl -sSf --proto '=https' --tlsv1.2 -L \
+              ${MoonbeamBinaryGzipURL} \
+            | gunzip \
+            > /home/${EC2Username}/bin/moonbeam
+
             /bin/chmod 0755 /home/${EC2Username}/bin/moonbeam
+
+            /bin/mkdir ${VolumeDataDir}
+
+            /bin/chmod 0755 ${VolumeDataDir}
+
+            /usr/bin/sudo /usr/sbin/adduser \
+              moonbase_service \
+              --system \
+              --no-create-home
+
+            /bin/chown moonbase_service ${VolumeDataDir}
 
             /usr/bin/echo -e "
               [Unit]
@@ -244,10 +261,22 @@ Resources:
             > /etc/systemd/system/moonbeam.service
 
             /usr/bin/sudo /bin/systemctl enable moonbeam.service
+
             /usr/bin/sudo /bin/systemctl start moonbeam.service
 
-            /bin/mkdir -p /var/lib/gantree/relay
-            /bin/mkdir -p /var/lib/gantree/parachain
+            cd /home/${EC2Username}/bin
+
+            /bin/curl -sSf --proto '=https' --tlsv1.2 -L \
+              ${MoonbeamGantreeNodeWatchdogTarballURL} \
+            | /bin/tar zx --strip-components 2
+
+            cd /home/${EC2Username}
+
+            /bin/chmod 0755 /home/${EC2Username}/bin/gantree_node_watchdog
+
+            /bin/mkdir -p ${VolumeDataDir}/gantree/relay
+
+            /bin/mkdir -p ${VolumeDataDir}/gantree/parachain
 
             /usr/bin/echo -e "
             {
@@ -277,10 +306,10 @@ Resources:
             After=network.target
 
             [Service]
-            WorkingDirectory=/var/lib/gantree/relay
+            WorkingDirectory=${VolumeDataDir}/gantree/relay
             Type=simple
             Restart=always
-            ExecStart=/usr/local/bin/gantree_node_watchdog
+            ExecStart=/home/${EC2Username}/bin/gantree_node_watchdog
 
             [Install]
             WantedBy=multi-user.target
@@ -293,10 +322,10 @@ Resources:
             After=network.target
 
             [Service]
-            WorkingDirectory=/var/lib/gantree/parachain
+            WorkingDirectory=${VolumeDataDir}/gantree/parachain
             Type=simple
             Restart=always
-            ExecStart=/usr/local/bin/gantree_node_watchdog
+            ExecStart=/home/${EC2Username}/bin/gantree_node_watchdog
 
             [Install]
             WantedBy=multi-user.target
@@ -304,11 +333,15 @@ Resources:
             > /etc/systemd/system/gantree-parachain.service
 
             /usr/bin/sudo /bin/systemctl enable gantree-relay
+
             /usr/bin/sudo /bin/systemctl start gantree-relay
+
             /bin/journalctl -f -u gantree-relay
 
             /usr/bin/sudo /bin/systemctl enable gantree-parachain
+
             /usr/bin/sudo /bin/systemctl start gantree-parachain
+
             /bin/journalctl -f -u gantree-parachain
 
 Outputs:
