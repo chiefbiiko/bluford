@@ -38,7 +38,7 @@ Parameters:
   MoonbeamBinaryGzipURL:
     Description: Github release URL serving a gzipped prebuilt moonbeam binary
     Type: String
-    Default: https://github.com/nuggetdigital/moonbeam-binary/releases/download/v0.6.0/moonbeam-v0.6.0-ubuntu-20.04.gz
+    Default: https://github.com/nuggetdigital/moonbeam-binary/releases/download/v0.6.1/moonbeam-v0.6.1-ubuntu-20.04.gz
 
   MoonbeamGantreeNodeWatchdogTarballURL:
     Description: Github release URL serving a tarballed prebuilt gantree watchdog binary
@@ -48,7 +48,7 @@ Parameters:
   VolumeDataDir:
     Description: Data dir path on the EBS volume
     Type: String
-    Default: /var/lib/.moonbeam/alphanet # TODO actually switch to a volume dir
+    Default: /data/moonbeam/alphanet
 
   Environment:
     Description: Application environment
@@ -198,7 +198,19 @@ Resources:
         UserData: !Base64
           "Fn::Sub": |
             #!/bin/bash
-            /bin/mkdir -p ${VolumeDataDir} # TODO prep & switch to the volume
+            /usr/bin/sudo /bin/mkfs -t xfs /dev/xvdh
+
+            /usr/bin/sudo mkdir /data
+
+            uuid="$(/usr/bin/sudo blkid | /bin/grep xvdh | /bin/grep -oE '[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+')"
+
+            /usr/bin/echo -e "
+              UUID=$uuid  $(dirname ${VolumeDataDir})  xfs  defaults,nofail,nobootwait  0  2
+            " >> /etc/fstab
+
+            /usr/bin/sudo /bin/mount -a
+
+            /bin/mkdir -p ${VolumeDataDir}
 
             /bin/mkdir -p /home/${EC2Username}/bin
 
