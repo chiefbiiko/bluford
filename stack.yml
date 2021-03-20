@@ -209,7 +209,7 @@ Resources:
             )"
 
             /usr/bin/echo -e "
-              UUID=$uuid  $(/bin/dirname ${VolumeDataDir})  xfs  defaults,nofail,nobootwait  0  2
+              UUID=$uuid  /data  xfs  defaults,nofail,nobootwait  0  2
             " >> /etc/fstab
 
             /usr/bin/sudo /bin/mount -a
