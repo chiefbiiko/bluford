@@ -198,7 +198,7 @@ Resources:
         UserData: !Base64
           "Fn::Sub": |
             #!/bin/bash
-            /usr/bin/sudo /usr/sbin/mkfs -t xfs /dev/xvdh
+            /usr/bin/sudo /usr/sbin/mkfs -t ext4 /dev/xvdh
 
             /usr/bin/sudo /bin/mkdir /data
 
@@ -209,7 +209,7 @@ Resources:
             )"
 
             /usr/bin/echo -e "
-              UUID=$uuid  /data  xfs  defaults,nofail,nobootwait  0  2
+              UUID=$uuid  /data  ext4  defaults,nofail,nobootwait  0  2
             " >> /etc/fstab
 
             /usr/bin/sudo /bin/mount -a
