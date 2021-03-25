@@ -11,6 +11,8 @@ https://docs.moonbeam.network/staking/stake/
 
 **2 collate**
 
+https://docs.moonbeam.network/node-operators/networks/collator/
+
 ```sh
 ...
 ExecStart=/home/${EC2Username}/bin/moonbeam \
