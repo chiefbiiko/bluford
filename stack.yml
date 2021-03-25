@@ -257,13 +257,13 @@ Resources:
                 --log info \
                 --base-path ${VolumeDataDir} \
                 --chain alphanet \
-                --name "${AWS::StackName}🐝🐝🌒" \
+                --name "${AWS::StackName}🌒🛸" \
                 -- \
                 --port 30334 \
                 --rpc-port 9934 \
                 --ws-port 9945 \
                 --pruning=archive \
-                --name "${AWS::StackName}🐝🐝🌒-embedded-relayer"
+                --name "${AWS::StackName}🌒🛸-embedded-relayer"
 
               [Install]
               WantedBy=multi-user.target
